@@ -14,7 +14,17 @@ No backend, no API keys, no cloud.
 
 React 18 + TypeScript (strict, no `any`), Vite, Tailwind CSS v4 (dark-only UI), Dexie.js over
 IndexedDB, Web Speech API (`webkitSpeechRecognition`) for voice, Vitest for tests. No router —
-a single `view` state toggles between the feed and the rules editor.
+a single `view` state toggles between three views: **brain** (default), **feed**, and **rules**.
+
+### Brain view (`components/BrainView.tsx`)
+
+One drifting bubble per category, sized by thought count, colored by category. Physics
+(gentle drift, wall bounce, soft pairwise repulsion) runs outside React: positions live in a
+`Map` ref and are written as `translate3d` transforms each animation frame, so React never
+re-renders at 60 fps. Positions are also applied synchronously when bodies are (re)built,
+because rAF never fires in hidden tabs. Drift pauses while a panel is open and under
+`prefers-reduced-motion`. Click a bubble → panel with that category's thoughts → click a
+thought → focused card with Copy / Delete.
 
 ## Architecture
 
@@ -32,6 +42,7 @@ src/
     speech.d.ts            Web Speech API type declarations (not in TS DOM lib)
     useVoiceCapture.ts     continuous hands-free dictation hook
   components/
+    BrainView                floating category bubbles (default view, see below)
     CaptureBox, CategoryTabs, Feed, ThoughtCard, RulesEditor, Toast
   utils/time.ts            relative timestamps
   App.tsx                  state owner: live queries, shortcuts, toasts, view toggle

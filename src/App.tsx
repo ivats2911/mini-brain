@@ -7,6 +7,7 @@ import { categorize } from './categorization/engine';
 import { INBOX_ID } from './categorization/rules';
 import type { Thought } from './types';
 import { useVoiceCapture } from './voice/useVoiceCapture';
+import { BrainView } from './components/BrainView';
 import { CaptureBox } from './components/CaptureBox';
 import { CategoryTabs } from './components/CategoryTabs';
 import { Feed } from './components/Feed';
@@ -21,7 +22,7 @@ export default function App() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'feed' | 'settings'>('feed');
+  const [view, setView] = useState<'brain' | 'feed' | 'settings'>('brain');
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const captureRef = useRef<HTMLTextAreaElement>(null);
@@ -73,8 +74,7 @@ export default function App() {
       const key = e.key.toLowerCase();
       if (key === 'k') {
         e.preventDefault();
-        setView('feed');
-        requestAnimationFrame(() => captureRef.current?.focus());
+        captureRef.current?.focus();
       } else if (key === 'm') {
         e.preventDefault();
         voiceToggle();
@@ -166,15 +166,35 @@ export default function App() {
             Import
           </button>
           <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
-          <button onClick={() => setView(view === 'settings' ? 'feed' : 'settings')} className={headerBtn}>
-            {view === 'settings' ? '← Feed' : '⚙ Rules'}
-          </button>
+          <span className="ml-1 flex overflow-hidden rounded-md border border-zinc-800">
+            {(
+              [
+                ['brain', '🫧 Brain'],
+                ['feed', '☰ Feed'],
+                ['settings', '⚙ Rules'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-2 py-1 transition-colors ${
+                  view === v ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
         </div>
       </header>
 
       <CaptureBox onSave={(text) => saveThought(text, 'typed')} voice={voice} inputRef={captureRef} />
 
-      {view === 'feed' ? (
+      {view === 'brain' && (
+        <BrainView rules={orderedRules} thoughts={thoughts ?? []} onDelete={handleDelete} />
+      )}
+
+      {view === 'feed' && (
         <>
           <CategoryTabs
             rules={orderedRules}
@@ -198,9 +218,9 @@ export default function App() {
             onReassign={handleReassign}
           />
         </>
-      ) : (
-        <RulesEditor rules={orderedRules} />
       )}
+
+      {view === 'settings' && <RulesEditor rules={orderedRules} />}
 
       {toast && (
         <Toast
