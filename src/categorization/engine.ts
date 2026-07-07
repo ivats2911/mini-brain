@@ -13,7 +13,8 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Single words match on word boundaries ("model" ≠ "modeling");
+ * Single words match on word boundaries, with simple plurals allowed
+ * ("interview" matches "interviews" but "model" still ≠ "modeling");
  * multi-word phrases match as substrings ("print on demand").
  * `text` must already be lowercased.
  */
@@ -21,7 +22,7 @@ export function matchesKeyword(text: string, term: string): boolean {
   const t = term.trim().toLowerCase();
   if (!t) return false;
   if (t.includes(' ')) return text.includes(t);
-  return new RegExp(`\\b${escapeRegExp(t)}\\b`).test(text);
+  return new RegExp(`\\b${escapeRegExp(t)}(?:s|es)?\\b`).test(text);
 }
 
 /** Sum of weights of matched keywords. Each keyword counts at most once. */

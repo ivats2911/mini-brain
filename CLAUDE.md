@@ -126,7 +126,8 @@ Dexie DB `mini-brain`, v1: `thoughts: 'id, createdAt, categoryId'`, `rules: 'id'
 
 1. Lowercase the thought text.
 2. For every category, test each keyword:
-   - single word → word-boundary regex (`\bmodel\b`; "modeling" does NOT match),
+   - single word → word-boundary regex with simple plurals (`\bmodel(?:s|es)?\b`;
+     "models" matches, "modeling" does NOT),
    - multi-word phrase → plain substring (`"print on demand"`).
 3. A matched keyword adds its weight (1–3) once, regardless of repetitions. Sum per category.
 4. Highest total wins. If the top score is **below the threshold (default 2)** or **tied**
@@ -140,7 +141,11 @@ when the category is still `'auto'` (manual picks are sticky).
 `rules.ts` seeds IndexedDB **on first run only** (`seedRulesIfEmpty`, transactional so React
 StrictMode can't double-seed). After that the `rules` table is the source of truth, edited via
 the ⚙ Rules panel (add/remove categories & keywords, cycle weights, colors). Inbox cannot be
-deleted; deleting a category moves its thoughts to Inbox.
+deleted; deleting a category moves its thoughts to Inbox. Because existing installs never
+re-seed, seed improvements reach live DBs via the "⟳ Merge seed keywords" button in Rules
+(`mergeSeedKeywords`: adds missing seed terms, never removes or re-weights user edits).
+The assistant explains every Inbox outcome (tie / under threshold / no match, naming the
+closest category) so rule tuning is never guesswork.
 
 ### Voice assistant (`assistant/assistant.ts`, `voice/useSpeaker.ts`, `components/AssistantBar.tsx`)
 

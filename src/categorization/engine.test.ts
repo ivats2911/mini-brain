@@ -20,22 +20,27 @@ describe('categorize', () => {
   });
 
   it('the higher-scoring category wins when several match', () => {
-    // youtube: script(2) + video(2) = 4; ai: llm(3) = 3
+    // ai: llm(3) + agents→agent(2) = 5; youtube: script(2) + video(2) = 4
     const r = cat('script a video about llm agents');
-    expect(r.categoryId).toBe('youtube');
-    expect(r.scores['ai-engineering']).toBe(3);
+    expect(r.categoryId).toBe('ai-engineering');
+    expect(r.scores['ai-engineering']).toBe(5);
     expect(r.scores['youtube']).toBe(4);
   });
 
   it('matches multi-word phrases as substrings', () => {
-    // "print on demand"(3) + webhook(2); "orders" must NOT match single word "order"
+    // "print on demand"(3) + orders→order(2) + webhook(2)
     const r = cat('automate print on demand orders with a webhook');
     expect(r.categoryId).toBe('pod');
-    expect(r.scores['pod']).toBe(5);
+    expect(r.scores['pod']).toBe(7);
   });
 
   it('matches phrases that start with digits', () => {
     expect(cat('3d print a fidget toy tonight').categoryId).toBe('youtube'); // 3d print(3) + fidget(3)
+  });
+
+  it('matches simple plurals of single-word keywords', () => {
+    expect(cat('two interviews lined up this week').categoryId).toBe('job-search');
+    expect(cat('my resumes need a rework for these jobs').categoryId).toBe('job-search');
   });
 
   it('does not match single-word keywords inside larger words', () => {

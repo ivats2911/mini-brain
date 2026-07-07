@@ -82,6 +82,10 @@ export const seedRules: CategoryRule[] = [
     name: 'Job Search',
     color: '#fbbf24',
     keywords: [
+      { term: 'job', weight: 2 },
+      { term: 'job search', weight: 3 },
+      { term: 'apply', weight: 2 },
+      { term: 'hiring', weight: 2 },
       { term: 'interview', weight: 3 },
       { term: 'resume', weight: 3 },
       { term: 'application', weight: 2 },

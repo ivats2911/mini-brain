@@ -25,6 +25,33 @@ export async function seedRulesIfEmpty(): Promise<void> {
   });
 }
 
+/**
+ * Merge seed keywords into the live rules without touching user edits:
+ * adds seed terms a category is missing, never removes or re-weights
+ * existing ones, and restores seed categories that were deleted.
+ * Returns how many keywords were added.
+ */
+export async function mergeSeedKeywords(): Promise<number> {
+  let added = 0;
+  await db.transaction('rw', db.rules, async () => {
+    for (const seed of seedRules) {
+      const existing = await db.rules.get(seed.id);
+      if (!existing) {
+        await db.rules.add(seed);
+        added += seed.keywords.length;
+        continue;
+      }
+      const have = new Set(existing.keywords.map((k) => k.term));
+      const missing = seed.keywords.filter((k) => !have.has(k.term));
+      if (missing.length > 0) {
+        await db.rules.update(seed.id, { keywords: [...existing.keywords, ...missing] });
+        added += missing.length;
+      }
+    }
+  });
+  return added;
+}
+
 /** Delete a category; its thoughts fall back to Inbox. Inbox itself can't be deleted. */
 export async function deleteCategory(id: string): Promise<void> {
   if (id === INBOX_ID) return;

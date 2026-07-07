@@ -1,4 +1,5 @@
 import { INBOX_ID, type CategoryRule } from '../categorization/rules';
+import type { CategorizationResult } from '../categorization/engine';
 import { significantWords } from '../graph/buildGraph';
 import type { Thought } from '../types';
 
@@ -154,7 +155,33 @@ export function findRelated(text: string, thoughts: Thought[], excludeId: string
   return undefined;
 }
 
-export function composeReply(thought: Thought, ctx: AssistantContext): string {
+/** Explain WHY a thought landed in Inbox, so tuning rules is never guesswork. */
+function inboxLine(rules: CategoryRule[], result?: CategorizationResult): string {
+  if (result) {
+    const entries = Object.entries(result.scores)
+      .filter(([id]) => id !== INBOX_ID)
+      .sort((a, b) => b[1] - a[1]);
+    const top = entries[0];
+    if (top && top[1] > 0) {
+      const name = (id: string) => rules.find((r) => r.id === id)?.name ?? id;
+      const tied = entries.filter(([, s]) => s === top[1]);
+      if (tied.length > 1) {
+        return `Went to Inbox — it tied between ${name(tied[0][0])} and ${name(tied[1][0])}; tap the pill to pick one.`;
+      }
+      return `Went to Inbox — ${name(top[0])} was closest but scored under the bar; add a stronger keyword to ${name(top[0])} in Rules and this sorts itself next time.`;
+    }
+  }
+  return 'Went to Inbox — no keywords matched; tap the pill to reassign it, or teach me a keyword in Rules.';
+}
+
+export type ComposeOptions = {
+  /** Categorization scores, for explaining Inbox outcomes. */
+  result?: CategorizationResult;
+  /** One short sentence only — used for speech while the mic is muted. */
+  brief?: boolean;
+};
+
+export function composeReply(thought: Thought, ctx: AssistantContext, opts: ComposeOptions = {}): string {
   const rule = ctx.rules.find((r) => r.id === thought.categoryId);
   const name = rule?.name ?? 'Inbox';
   const count = ctx.thoughts.filter((t) => t.categoryId === thought.categoryId && t.id !== thought.id).length + 1;
@@ -163,10 +190,12 @@ export function composeReply(thought: Thought, ctx: AssistantContext): string {
   const parts: string[] = [];
 
   if (thought.categoryId === INBOX_ID) {
-    parts.push("Went to Inbox — tap the pill to reassign it, or teach me a keyword in Rules.");
+    parts.push(inboxLine(ctx.rules, opts.result));
   } else {
     parts.push(`Filed under ${name} — ${count === 1 ? 'your first one there' : `number ${count} there`}.`);
   }
+
+  if (opts.brief) return parts[0];
 
   // Concrete plan beats generic advice; category advice beats nothing.
   if (playbook) {

@@ -1,17 +1,33 @@
 import { useState } from 'react';
 import { nanoid } from 'nanoid';
-import { db, deleteCategory } from '../db/db';
+import { db, deleteCategory, mergeSeedKeywords } from '../db/db';
 import { INBOX_ID, type CategoryRule } from '../categorization/rules';
 
 const WEIGHTS = [1, 2, 3] as const;
 
 export function RulesEditor({ rules }: { rules: CategoryRule[] }) {
+  const [mergeMsg, setMergeMsg] = useState<string | null>(null);
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-500">
         Categories and keywords drive auto-sorting. A thought needs a score of at least 2 to leave Inbox;
-        ties also land in Inbox. Click a keyword to cycle its weight (×1 → ×2 → ×3). Changes save instantly.
+        ties also land in Inbox. Single-word keywords also match simple plurals (interview → interviews).
+        Click a keyword to cycle its weight (×1 → ×2 → ×3). Changes save instantly.
       </p>
+      <div className="flex items-center gap-2 text-xs">
+        <button
+          onClick={() =>
+            void mergeSeedKeywords().then((n) =>
+              setMergeMsg(n > 0 ? `Added ${n} keyword${n === 1 ? '' : 's'} from the seed set.` : 'Already up to date.'),
+            )
+          }
+          className="rounded-md border border-white/10 px-2.5 py-1 text-zinc-300 transition-colors hover:bg-white/5"
+          title="Add any seed keywords your categories are missing — never removes or re-weights your own"
+        >
+          ⟳ Merge seed keywords
+        </button>
+        {mergeMsg && <span className="text-zinc-500">{mergeMsg}</span>}
+      </div>
       {rules.map((rule) => (
         <RuleCard key={rule.id} rule={rule} />
       ))}

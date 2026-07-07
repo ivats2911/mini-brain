@@ -69,14 +69,18 @@ export default function App() {
       setLastSaved({ thought, at: Date.now() });
 
       // Assistant: compose an actionable reply, show it, and speak it.
-      const reply = composeReply(thought, { rules: rules ?? [], thoughts: thoughts ?? [] });
+      // Voice mode gets a one-sentence spoken confirmation — the mic is muted
+      // while the app talks, so long speeches would swallow the next thought.
+      const ctx = { rules: rules ?? [], thoughts: thoughts ?? [] };
+      const reply = composeReply(thought, ctx, { result });
+      const spoken = source === 'voice' ? composeReply(thought, ctx, { result, brief: true }) : reply;
       setThinking(true);
       if (thinkTimerRef.current !== null) window.clearTimeout(thinkTimerRef.current);
       thinkTimerRef.current = window.setTimeout(() => {
         thinkTimerRef.current = null;
         setThinking(false);
         setAssistantReply(reply);
-        if (speaker.enabled) speaker.speak(reply);
+        if (speaker.enabled) speaker.speak(spoken);
       }, 600);
     },
     [rules, thoughts, speaker],

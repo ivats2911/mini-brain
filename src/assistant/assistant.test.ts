@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composeReply, detectIntent, findRelated } from './assistant';
+import { categorize } from '../categorization/engine';
 import { seedRules } from '../categorization/rules';
 import type { Thought } from '../types';
 
@@ -57,6 +58,27 @@ describe('composeReply', () => {
     const reply = composeReply(mk('completely unplaceable', 'inbox'), ctx([]));
     expect(reply).toContain('Inbox');
     expect(reply).toContain('Rules');
+  });
+
+  it('explains an Inbox tie by naming both categories', () => {
+    const text = 'gym before the interview';
+    const result = categorize(text, seedRules);
+    const reply = composeReply(mk(text, result.categoryId), ctx([]), { result });
+    expect(reply).toContain('tied between');
+    expect(reply).toContain('Job Search');
+    expect(reply).toContain('Personal / Life');
+  });
+
+  it('explains a below-threshold Inbox result and names the closest category', () => {
+    const text = 'buy milk';
+    const result = categorize(text, seedRules);
+    const reply = composeReply(mk(text, result.categoryId), ctx([]), { result });
+    expect(reply).toContain('Personal / Life was closest');
+  });
+
+  it('brief mode returns only the one-sentence filing line', () => {
+    const brief = composeReply(mk('two interviews lined up', 'job-search'), ctx([]), { brief: true });
+    expect(brief).toBe('Filed under Job Search — your first one there.');
   });
 
   it('falls back to generic advice for custom categories', () => {
