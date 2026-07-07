@@ -52,7 +52,7 @@ export function makeLabel(text: string): string {
   return words.length <= 6 ? clean : `${words.slice(0, 6).join(' ')}…`;
 }
 
-function significantWords(text: string): Set<string> {
+export function significantWords(text: string): Set<string> {
   const out = new Set<string>();
   for (const w of text.toLowerCase().replace(/\[\[|\]\]/g, ' ').split(/[^\p{L}\d]+/u)) {
     if (w.length >= 5 && !STOPWORDS.has(w) && !/^\d+$/.test(w)) out.add(w);

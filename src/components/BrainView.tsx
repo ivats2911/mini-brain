@@ -124,9 +124,13 @@ export function BrainView({ rules, thoughts, onDelete, lastSaved, originRef }: P
       }
       const angle = Math.random() * Math.PI * 2;
       const speed = 14 + Math.random() * 16; // px per second — lava lamp, not screensaver
+      // Spawn below the floating header/capture column so nothing starts hidden.
+      const crect = el.getBoundingClientRect();
+      const orig = originRef?.current?.getBoundingClientRect();
+      const minY = orig ? Math.min(H - 2 * r, orig.bottom - crect.top + 40) : 0;
       bodies.set(rule.id, {
         x: r + Math.random() * Math.max(1, W - 2 * r),
-        y: r + Math.random() * Math.max(1, H - 2 * r),
+        y: minY + r + Math.random() * Math.max(1, H - minY - 2 * r),
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         r,
@@ -198,6 +202,18 @@ export function BrainView({ rules, thoughts, onDelete, lastSaved, originRef }: P
 
       if (!openRef.current && !reduceMotion) {
         const ptr = pointerRef.current;
+        // Exclusion zone: the floating header + capture column (plus the
+        // assistant bar below it) — bubbles must never hide under it.
+        const crect = el.getBoundingClientRect();
+        const orig = originRef?.current?.getBoundingClientRect();
+        const ui = orig
+          ? {
+              left: orig.left - crect.left - 12,
+              right: orig.right - crect.left + 12,
+              top: 0,
+              bottom: orig.bottom - crect.top + 96,
+            }
+          : null;
         for (const b of bodies.values()) {
           // Organic wander: heading slowly oscillates instead of flying straight.
           const heading = Math.atan2(b.vy, b.vx) + Math.sin(t * b.turnFreq + b.phase) * 0.9 * dt;
@@ -215,6 +231,28 @@ export function BrainView({ rules, thoughts, onDelete, lastSaved, originRef }: P
               const f = ((range - pdist) / range) * 900 * dt;
               b.vx += (pdx / pdist) * f;
               b.vy += (pdy / pdist) * f;
+            }
+          }
+
+          // Steer away from the UI zone (repel from the nearest rect point).
+          if (ui) {
+            const nx = Math.min(Math.max(b.x, ui.left), ui.right);
+            const ny = Math.min(Math.max(b.y, ui.top), ui.bottom);
+            let dx = b.x - nx;
+            let dy = b.y - ny;
+            let dist = Math.hypot(dx, dy);
+            if (dist === 0) {
+              // Centre is inside the zone — push straight down and out.
+              dx = 0;
+              dy = 1;
+              dist = 1;
+              b.y += 90 * dt;
+            }
+            const range = b.r + 28;
+            if (dist < range) {
+              const f = ((range - dist) / range) * 1400 * dt;
+              b.vx += (dx / dist) * f;
+              b.vy += (dy / dist) * f;
             }
           }
 

@@ -18,6 +18,9 @@ export type VoiceCapture = {
   start: () => void;
   stop: () => void;
   toggle: () => void;
+  /** Temporarily mute recognition (e.g. while the app speaks) without leaving voice mode. */
+  pause: () => void;
+  resume: () => void;
 };
 
 /**
@@ -36,6 +39,7 @@ export function useVoiceCapture(options: VoiceCaptureOptions): VoiceCapture {
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const activeRef = useRef(false); // user intent: keep listening across auto-restarts
+  const suspendedRef = useRef(false); // muted while the app itself is speaking
   const bufferRef = useRef('');
   const interimRef = useRef('');
   const silenceTimerRef = useRef<number | null>(null);
@@ -127,7 +131,7 @@ export function useVoiceCapture(options: VoiceCaptureOptions): VoiceCapture {
     };
 
     recognition.onend = () => {
-      if (activeRef.current) {
+      if (activeRef.current && !suspendedRef.current) {
         window.setTimeout(() => {
           if (!activeRef.current) return;
           try {
@@ -155,6 +159,30 @@ export function useVoiceCapture(options: VoiceCaptureOptions): VoiceCapture {
     else start();
   }, [start, stop]);
 
+  const pause = useCallback(() => {
+    if (!activeRef.current || suspendedRef.current) return;
+    suspendedRef.current = true;
+    clearSilenceTimer();
+    // Drop whatever the mic caught so the app's own voice is never saved.
+    bufferRef.current = '';
+    interimRef.current = '';
+    setFinalText('');
+    setInterimText('');
+    recognitionRef.current?.abort();
+  }, [clearSilenceTimer]);
+
+  const resume = useCallback(() => {
+    if (!suspendedRef.current) return;
+    suspendedRef.current = false;
+    if (activeRef.current) {
+      try {
+        recognitionRef.current?.start();
+      } catch {
+        // already running
+      }
+    }
+  }, []);
+
   useEffect(
     () => () => {
       activeRef.current = false;
@@ -164,5 +192,5 @@ export function useVoiceCapture(options: VoiceCaptureOptions): VoiceCapture {
     [clearSilenceTimer],
   );
 
-  return { supported, listening, finalText, interimText, error, start, stop, toggle };
+  return { supported, listening, finalText, interimText, error, start, stop, toggle, pause, resume };
 }

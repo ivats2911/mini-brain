@@ -7,6 +7,9 @@ import { categorize } from './categorization/engine';
 import { INBOX_ID } from './categorization/rules';
 import type { Thought } from './types';
 import { useVoiceCapture } from './voice/useVoiceCapture';
+import { useSpeaker } from './voice/useSpeaker';
+import { composeReply } from './assistant/assistant';
+import { AssistantBar, type AssistantStatus } from './components/AssistantBar';
 import { BrainView } from './components/BrainView';
 import { MapView } from './components/MapView';
 import { CaptureBox } from './components/CaptureBox';
@@ -26,6 +29,9 @@ export default function App() {
   const [view, setView] = useState<'brain' | 'map' | 'feed' | 'settings'>('brain');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [lastSaved, setLastSaved] = useState<{ thought: Thought; at: number } | null>(null);
+  const [assistantReply, setAssistantReply] = useState<string | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const thinkTimerRef = useRef<number | null>(null);
 
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +49,8 @@ export default function App() {
 
   const ruleById = useMemo(() => new Map(orderedRules.map((r) => [r.id, r])), [orderedRules]);
 
+  const speaker = useSpeaker();
+
   const saveThought = useCallback(
     (text: string, source: Thought['source']) => {
       const trimmed = text.trim();
@@ -59,8 +67,19 @@ export default function App() {
       void db.thoughts.add(thought);
       setToast({ kind: 'saved', thought });
       setLastSaved({ thought, at: Date.now() });
+
+      // Assistant: compose an actionable reply, show it, and speak it.
+      const reply = composeReply(thought, { rules: rules ?? [], thoughts: thoughts ?? [] });
+      setThinking(true);
+      if (thinkTimerRef.current !== null) window.clearTimeout(thinkTimerRef.current);
+      thinkTimerRef.current = window.setTimeout(() => {
+        thinkTimerRef.current = null;
+        setThinking(false);
+        setAssistantReply(reply);
+        if (speaker.enabled) speaker.speak(reply);
+      }, 600);
     },
-    [rules],
+    [rules, thoughts, speaker],
   );
 
   const voice = useVoiceCapture({
@@ -86,6 +105,21 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [voiceToggle]);
+
+  // Mute the mic while the app speaks so it never transcribes its own voice.
+  const voicePause = voice.pause;
+  const voiceResume = voice.resume;
+  useEffect(() => {
+    if (speaker.speaking) voicePause();
+    else voiceResume();
+  }, [speaker.speaking, voicePause, voiceResume]);
+
+  useEffect(
+    () => () => {
+      if (thinkTimerRef.current !== null) window.clearTimeout(thinkTimerRef.current);
+    },
+    [],
+  );
 
   // Auto-dismiss toast.
   useEffect(() => {
@@ -147,6 +181,14 @@ export default function App() {
   };
 
   const totalCount = thoughts?.length ?? 0;
+
+  const assistantStatus: AssistantStatus = thinking
+    ? 'thinking'
+    : speaker.speaking
+      ? 'speaking'
+      : voice.listening
+        ? 'listening'
+        : 'idle';
 
   return (
     <>
@@ -217,6 +259,18 @@ export default function App() {
       <div className="pointer-events-auto">
         <CaptureBox onSave={(text) => saveThought(text, 'typed')} voice={voice} inputRef={captureRef} />
       </div>
+
+      <AssistantBar
+        status={assistantStatus}
+        reply={assistantReply}
+        speechSupported={speaker.supported}
+        speechEnabled={speaker.enabled}
+        onToggleSpeech={() => speaker.setEnabled(!speaker.enabled)}
+        onDismiss={() => {
+          setAssistantReply(null);
+          speaker.cancel();
+        }}
+      />
 
       {view === 'feed' && (
         <>

@@ -94,9 +94,12 @@ src/
   db/
     db.ts                  Dexie schema (thoughts, rules), seeding, deleteCategory
     backup.ts              JSON export / merge-import with runtime validation
+  assistant/
+    assistant.ts           offline rule-based reply engine (intent + advice, unit-tested)
   voice/
     speech.d.ts            Web Speech API type declarations (not in TS DOM lib)
-    useVoiceCapture.ts     continuous hands-free dictation hook
+    useVoiceCapture.ts     continuous hands-free dictation hook (pause/resume for echo guard)
+    useSpeaker.ts          speechSynthesis TTS: en-GB voice, gesture unlock, mute pref
   components/
     BrainView                floating category bubbles (default view, see below)
     CaptureBox, CategoryTabs, Feed, ThoughtCard, RulesEditor, Toast
@@ -138,6 +141,21 @@ when the category is still `'auto'` (manual picks are sticky).
 StrictMode can't double-seed). After that the `rules` table is the source of truth, edited via
 the ⚙ Rules panel (add/remove categories & keywords, cycle weights, colors). Inbox cannot be
 deleted; deleting a category moves its thoughts to Inbox.
+
+### Voice assistant (`assistant/assistant.ts`, `voice/useSpeaker.ts`, `components/AssistantBar.tsx`)
+
+Every captured thought (typed or dictated) gets a short actionable reply, shown in the
+AssistantBar under the capture box and spoken aloud via `speechSynthesis` — **offline and
+rule-based, no LLM/network**. `composeReply` = category line + count, intent-matched advice
+(`detectIntent`: idea → question → task → note, in that order — "what if" is an idea before
+the question heuristic fires), and a quote from the most recent earlier thought sharing a
+significant word (≥5 chars). Inbox saves get a "teach me in Rules" message instead of advice.
+`useSpeaker` prefers a Google en-GB voice (async `voiceschanged`), primes audio with a silent
+utterance on the first pointer/key gesture (browser autoplay gate), and persists the 🔊/🔇
+preference in localStorage. Status line shows ● listening / thinking / speaking (thinking is a
+600 ms staged delay — replies are actually instant). **Echo guard**: while the app speaks,
+`useVoiceCapture.pause()` aborts recognition and drops the buffer so the mic never transcribes
+the app's own voice; `resume()` restarts it when speech ends.
 
 ### Voice capture (`voice/useVoiceCapture.ts`)
 
