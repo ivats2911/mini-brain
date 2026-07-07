@@ -17,7 +17,7 @@ type Props = {
 };
 
 const wrapper =
-  'fixed bottom-4 left-1/2 z-50 w-max max-w-[90vw] -translate-x-1/2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm shadow-2xl';
+  'toast-in fixed bottom-4 left-1/2 z-50 w-max max-w-[90vw] -translate-x-1/2 rounded-xl border border-white/10 bg-[#15151d]/90 px-4 py-2.5 text-sm shadow-2xl backdrop-blur-xl';
 
 export function Toast({ toast, rules, onDismiss, onUndoSave, onUndoDelete, onChangeCategory }: Props) {
   const [changing, setChanging] = useState(false);

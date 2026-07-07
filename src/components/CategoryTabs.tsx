@@ -16,8 +16,8 @@ export function CategoryTabs({ rules, counts, total, selected, onSelect }: Props
         onClick={() => onSelect('all')}
         className={`${base} ${
           selected === 'all'
-            ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-            : 'border-zinc-800 text-zinc-400 hover:text-zinc-200'
+            ? 'border-white/25 bg-white/10 text-zinc-100'
+            : 'border-white/[0.08] text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
         }`}
       >
         All <span className="opacity-60">{total}</span>
@@ -26,7 +26,7 @@ export function CategoryTabs({ rules, counts, total, selected, onSelect }: Props
         <button
           key={r.id}
           onClick={() => onSelect(r.id)}
-          className={`${base} ${selected === r.id ? '' : 'border-zinc-800 text-zinc-400 hover:text-zinc-200'}`}
+          className={`${base} ${selected === r.id ? '' : 'border-white/[0.08] text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}
           style={
             selected === r.id
               ? { backgroundColor: `${r.color}26`, borderColor: r.color, color: r.color }

@@ -33,7 +33,7 @@ function RuleCard({ rule }: { rule: CategoryRule }) {
   };
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+    <section className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur">
       <div className="mb-3 flex items-center gap-2">
         <input
           type="color"
@@ -137,7 +137,7 @@ function AddCategory() {
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-800 p-4">
+    <div className="flex items-center gap-2 rounded-xl border border-dashed border-white/10 p-4">
       <input
         type="color"
         value={color}

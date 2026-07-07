@@ -14,17 +14,73 @@ No backend, no API keys, no cloud.
 
 React 18 + TypeScript (strict, no `any`), Vite, Tailwind CSS v4 (dark-only UI), Dexie.js over
 IndexedDB, Web Speech API (`webkitSpeechRecognition`) for voice, Vitest for tests. No router —
-a single `view` state toggles between three views: **brain** (default), **feed**, and **rules**.
+a single `view` state toggles between four views: **brain** (default), **map**, **feed**, and **rules**.
+
+### Map view (`components/MapView.tsx` + `graph/buildGraph.ts`)
+
+Every individual thought is a glowing synaptic node in a force graph (`force-graph` npm
+package, bundled — no CDN, offline preserved). `buildGraph` (pure, unit-tested) assigns each
+node a **numeric id equal to its index in the nodes array** (downstream features rely on index
+lookup), a 6-word label, `born` order for recency sizing/brightness, and extracts `#tags`.
+Links, in dedupe priority: `[[wikilink]]` refs → shared `#tags` (chained) → same-category
+chains → shared significant words (≥5 chars, non-stopword, max 3 word-links per node).
+Rendering: custom canvas draw with additive `lighter` blending for bloom, recency-based
+size/alpha, labels above zoom 1.4× or when highlighted. Simulation never settles
+(`d3AlphaDecay(0)` + a custom wander force). Hover lights the neighborhood; click flies the
+camera (`centerAt` + `zoom`), dims non-neighbors (depth of field), and opens a right-side
+panel (text, tags, copy/delete). Node positions persist across data rebuilds by reusing node
+objects keyed by thought id. Capped at the 200 most recent thoughts.
 
 ### Brain view (`components/BrainView.tsx`)
 
+**Fullscreen**: the field is `fixed inset-0` behind everything; in brain view App renders the
+header + capture box as a floating `pointer-events-none` column (`pointer-events-auto` on the
+interactive children) so clicks pass through to bubbles. The field jumps to `z-20` while a
+panel is open so the backdrop dims the whole screen. The fly-in projectile launches from the
+real capture box position via `originRef`.
+
+**Whispers**: each non-empty bubble shows one recent thought as a faint italic snippet below
+the orb, rotating through the 8 most recent on an 8s cycle (per-bubble phase offset so they
+don't switch in sync; driven by a 1s `nowSec` state tick, re-keyed for the fade-in). Hidden
+while a panel is open.
+
 One drifting bubble per category, sized by thought count, colored by category. Physics
-(gentle drift, wall bounce, soft pairwise repulsion) runs outside React: positions live in a
-`Map` ref and are written as `translate3d` transforms each animation frame, so React never
-re-renders at 60 fps. Positions are also applied synchronously when bodies are (re)built,
+(organic wandering heading, wall bounce, soft pairwise repulsion) runs outside React: positions
+live in a `Map` ref and are written as `translate3d` transforms each animation frame, so React
+never re-renders at 60 fps. Positions are also applied synchronously when bodies are (re)built,
 because rAF never fires in hidden tabs. Drift pauses while a panel is open and under
 `prefers-reduced-motion`. Click a bubble → panel with that category's thoughts → click a
-thought → focused card with Copy / Delete.
+thought → focused card with Copy / Delete. Esc closes the panel.
+
+**Design language** (neural/synaptic, not generic dark mode): deep near-black radial backdrop
+(`#12121c → #0a0a0f`) with a slow drifting ambient glow (`body::before`) and a ~4% film-grain
+overlay (`body::after`, SVG feTurbulence data-URI). Typography is Inter Variable, bundled
+locally via `@fontsource-variable/inter` (imported in main.tsx — no CDN, app stays offline).
+Surfaces are glass: `bg-white/[0.03..0.05]` + `border-white/10` + `backdrop-blur`. Orbs are
+frosted (backdrop-blur over the canvas), with an inner top-left light, colored rim-glow, and
+**recency-based brightness/size** — categories touched within the hour glow full, fading over
+a week (`freshnessOf`). Bubbles repel the cursor (pointer tracked in a ref, force applied in
+the physics tick with speed clamping) and tilt toward it on hover (perspective rotate on a
+dedicated `[data-tilt]` layer). Opening a bubble applies depth-of-field: other orbs
+scale/blur/dim and the canvas dims, while the panel springs in over a glass backdrop.
+
+**Animation system** (no dependencies — deliberate: a custom rAF loop owns every bubble
+transform, so Framer Motion would fight it; springs come from WAAPI + custom cubic-beziers):
+
+- A `<canvas>` layer under the bubbles, drawn in the same rAF tick: synapse lines between
+  nearby bubbles (gradient-tinted by both categories), ~36 twinkling dust particles, fly-in
+  projectiles, and expanding ripple rings.
+- On save, App passes `lastSaved` to BrainView; a glowing dot arcs (quadratic bezier, eased)
+  from the capture box into the target bubble, which ripples and spring-pulses (WAAPI on the
+  scaler span — CSS transforms on the wrapper are owned by the physics loop, so never animate
+  the wrapper).
+- CSS keyframes in `index.css`: `bubble-pop` (staggered spring entrance), `orb-breathe`,
+  `halo-pulse` (blurred glow behind each orb), `panel-in`/`backdrop-in`/`item-in` (staggered
+  list), `toast-in`. All use `fill-mode: backwards` — NOT `both`/`forwards`, which would pin
+  the transform and block hover transitions and WAAPI pulses. All disabled under
+  `prefers-reduced-motion` via a media query.
+- Bubble DOM layering: wrapper button (physics transform) → scaler span (pop-in, hover scale,
+  WAAPI pulse) → halo span + orb span (infinite breathe). Each layer owns its own transform.
 
 ## Architecture
 

@@ -25,7 +25,7 @@ export function CaptureBox({ onSave, voice, inputRef }: Props) {
   };
 
   return (
-    <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900 focus-within:border-zinc-600">
+    <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl transition-[border-color,box-shadow] duration-300 focus-within:border-cyan-400/30 focus-within:shadow-[0_0_40px_-12px_rgba(34,211,238,0.35)]">
       {voice.listening ? (
         <div className="min-h-[92px] whitespace-pre-wrap px-4 py-3 text-[15px] leading-relaxed">
           {voice.finalText}
@@ -45,7 +45,7 @@ export function CaptureBox({ onSave, voice, inputRef }: Props) {
           className="block w-full resize-none bg-transparent px-4 py-3 text-[15px] leading-relaxed outline-none placeholder:text-zinc-600"
         />
       )}
-      <div className="flex items-center justify-between gap-3 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
+      <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-3 py-2 text-xs tracking-wide text-zinc-500">
         <span>
           {voice.error ? (
             <span className="text-red-400">{voice.error}</span>
@@ -68,7 +68,7 @@ export function CaptureBox({ onSave, voice, inputRef }: Props) {
           className={`shrink-0 rounded-md border px-2.5 py-1 font-medium transition-colors ${
             voice.listening
               ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20'
-              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40'
+              : 'border-white/10 text-zinc-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40'
           }`}
         >
           🎤 {voice.listening ? 'Stop' : 'Voice'}

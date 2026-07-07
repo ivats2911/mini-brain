@@ -8,13 +8,14 @@ import { INBOX_ID } from './categorization/rules';
 import type { Thought } from './types';
 import { useVoiceCapture } from './voice/useVoiceCapture';
 import { BrainView } from './components/BrainView';
+import { MapView } from './components/MapView';
 import { CaptureBox } from './components/CaptureBox';
 import { CategoryTabs } from './components/CategoryTabs';
 import { Feed } from './components/Feed';
 import { RulesEditor } from './components/RulesEditor';
 import { Toast, type ToastState } from './components/Toast';
 
-const headerBtn = 'rounded-md px-2 py-1 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100';
+const headerBtn = 'rounded-md px-2 py-1 text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100';
 
 export default function App() {
   const thoughts = useLiveQuery(() => db.thoughts.orderBy('createdAt').reverse().toArray(), []);
@@ -22,8 +23,9 @@ export default function App() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'brain' | 'feed' | 'settings'>('brain');
+  const [view, setView] = useState<'brain' | 'map' | 'feed' | 'settings'>('brain');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [lastSaved, setLastSaved] = useState<{ thought: Thought; at: number } | null>(null);
 
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +58,7 @@ export default function App() {
       };
       void db.thoughts.add(thought);
       setToast({ kind: 'saved', thought });
+      setLastSaved({ thought, at: Date.now() });
     },
     [rules],
   );
@@ -146,11 +149,33 @@ export default function App() {
   const totalCount = thoughts?.length ?? 0;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-      <header className="mb-5 flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+    <>
+      {view === 'brain' && (
+        <BrainView
+          rules={orderedRules}
+          thoughts={thoughts ?? []}
+          onDelete={handleDelete}
+          lastSaved={lastSaved}
+          originRef={captureRef}
+        />
+      )}
+
+      {view === 'map' && (
+        <MapView rules={orderedRules} thoughts={thoughts ?? []} onDelete={handleDelete} lastSaved={lastSaved} />
+      )}
+
+      <div
+        className={`mx-auto max-w-2xl px-4 pt-6 ${
+          view === 'brain' || view === 'map' ? 'pointer-events-none relative z-10' : 'pb-24'
+        }`}
+      >
+        <header className="pointer-events-auto mb-5 flex items-center justify-between">
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-[0.01em]">
           <span>🧠</span> Mini Brain
-          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-normal text-zinc-400" title="Total thoughts">
+          <span
+            className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-normal tracking-wide text-zinc-400"
+            title="Total thoughts"
+          >
             {totalCount}
           </span>
         </h1>
@@ -166,10 +191,11 @@ export default function App() {
             Import
           </button>
           <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
-          <span className="ml-1 flex overflow-hidden rounded-md border border-zinc-800">
+          <span className="ml-1 flex overflow-hidden rounded-md border border-white/10">
             {(
               [
                 ['brain', '🫧 Brain'],
+                ['map', '🕸 Map'],
                 ['feed', '☰ Feed'],
                 ['settings', '⚙ Rules'],
               ] as const
@@ -178,7 +204,7 @@ export default function App() {
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-2 py-1 transition-colors ${
-                  view === v ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'
+                  view === v ? 'bg-white/10 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'
                 }`}
               >
                 {label}
@@ -188,11 +214,9 @@ export default function App() {
         </div>
       </header>
 
-      <CaptureBox onSave={(text) => saveThought(text, 'typed')} voice={voice} inputRef={captureRef} />
-
-      {view === 'brain' && (
-        <BrainView rules={orderedRules} thoughts={thoughts ?? []} onDelete={handleDelete} />
-      )}
+      <div className="pointer-events-auto">
+        <CaptureBox onSave={(text) => saveThought(text, 'typed')} voice={voice} inputRef={captureRef} />
+      </div>
 
       {view === 'feed' && (
         <>
@@ -207,7 +231,7 @@ export default function App() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search thoughts…"
-            className="mb-3 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus:border-zinc-600"
+            className="mb-3 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm outline-none backdrop-blur transition-colors placeholder:text-zinc-600 focus:border-cyan-400/30"
           />
           <Feed
             thoughts={filteredThoughts}
@@ -221,6 +245,7 @@ export default function App() {
       )}
 
       {view === 'settings' && <RulesEditor rules={orderedRules} />}
+      </div>
 
       {toast && (
         <Toast
@@ -242,6 +267,6 @@ export default function App() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

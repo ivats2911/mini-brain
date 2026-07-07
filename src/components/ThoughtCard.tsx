@@ -37,7 +37,7 @@ export function ThoughtCard({ thought, rule, rules, onDelete, onEdit, onReassign
   };
 
   return (
-    <li className="group rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
+    <li className="group rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 backdrop-blur transition-colors hover:bg-white/[0.05]">
       {editing ? (
         <div>
           <textarea
@@ -83,7 +83,7 @@ export function ThoughtCard({ thought, rule, rules, onDelete, onEdit, onReassign
                 onClick={() => setPickerOpen(false)}
                 aria-label="Close category picker"
               />
-              <span className="absolute left-0 top-6 z-20 flex w-44 flex-col rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+              <span className="brain-panel absolute left-0 top-6 z-20 flex w-44 flex-col rounded-lg border border-white/10 bg-[#12121c]/95 py-1 shadow-xl backdrop-blur-xl">
                 {rules
                   .filter((r) => r.id !== thought.categoryId)
                   .map((r) => (
