@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeReply, detectIntent, findRelated } from './assistant';
+import { bootGreeting, composeReply, detectIntent, findRelated } from './assistant';
 import { categorize } from '../categorization/engine';
 import { seedRules } from '../categorization/rules';
 import type { Thought } from '../types';
@@ -23,6 +23,7 @@ describe('detectIntent', () => {
   it('detects tasks from obligation phrases and imperative verbs', () => {
     expect(detectIntent('need to renew the domain before friday')).toBe('task');
     expect(detectIntent('buy more filament')).toBe('task');
+    expect(detectIntent('i want to buy a adidas ball')).toBe('task');
   });
 
   it('detects ideas, including "what if" before the question heuristic', () => {
@@ -42,16 +43,16 @@ describe('composeReply', () => {
     const existing = [mk('older llm thing', 'ai-engineering')];
     const reply = composeReply(mk('tune the llm', 'ai-engineering'), ctx(existing));
     expect(reply).toContain('AI Engineering');
-    expect(reply).toContain('number 2');
+    expect(reply).toContain('Number 2');
   });
 
   it('uses first-one phrasing for a fresh category', () => {
-    expect(composeReply(mk('draft the hook', 'youtube'), ctx([]))).toContain('your first one there');
+    expect(composeReply(mk('draft the intro', 'youtube'), ctx([]))).toContain('First one — historic');
   });
 
   it('gives intent-matched category advice', () => {
-    const reply = composeReply(mk('idea: a short about bambu plates', 'youtube'), ctx([]));
-    expect(reply).toContain('first two seconds');
+    const reply = composeReply(mk('idea: a video about bambu plates', 'youtube'), ctx([]));
+    expect(reply).toContain('Hook first');
   });
 
   it('explains Inbox instead of advising', () => {
@@ -64,7 +65,7 @@ describe('composeReply', () => {
     const text = 'gym before the interview';
     const result = categorize(text, seedRules);
     const reply = composeReply(mk(text, result.categoryId), ctx([]), { result });
-    expect(reply).toContain('tied between');
+    expect(reply).toContain('tied');
     expect(reply).toContain('Job Search');
     expect(reply).toContain('Personal / Life');
   });
@@ -73,35 +74,35 @@ describe('composeReply', () => {
     const text = 'buy milk';
     const result = categorize(text, seedRules);
     const reply = composeReply(mk(text, result.categoryId), ctx([]), { result });
-    expect(reply).toContain('Personal / Life was closest');
+    expect(reply).toContain('Personal / Life came closest');
   });
 
   it('brief mode returns only the one-sentence filing line', () => {
     const brief = composeReply(mk('two interviews lined up', 'job-search'), ctx([]), { brief: true });
-    expect(brief).toBe('Filed under Job Search — your first one there.');
+    expect(brief).toBe('Job Search. First one — historic.');
   });
 
   it('falls back to generic advice for custom categories', () => {
     const reply = composeReply(mk('need to look into this', 'my-custom-cat'), ctx([]));
-    expect(reply).toContain('deadline');
+    expect(reply).toContain('Deadline');
   });
 
   it('answers a purchase with a concrete plan and a follow-up question', () => {
     const reply = composeReply(mk('i want to buy a adidas ball', 'inbox'), ctx([]));
     expect(reply).toContain('adidas ball');
     expect(reply).toContain('price cap');
-    expect(reply).toContain('budget?');
+    expect(reply).toContain('budget');
   });
 
   it('prefers the action playbook over category advice', () => {
     const reply = composeReply(mk('need to fix the retention graph', 'youtube'), ctx([]));
     expect(reply).toContain('fifteen-minute step');
-    expect(reply).not.toContain('first two seconds');
+    expect(reply).not.toContain('Hook first');
   });
 
   it('asks an intent question for tasks without a playbook verb', () => {
     const reply = composeReply(mk('need to sort out the garage', 'personal'), ctx([]));
-    expect(reply).toContain('When do you want it done by?');
+    expect(reply).toContain('When by?');
   });
 
   it('keeps plain notes question-free', () => {
@@ -112,7 +113,7 @@ describe('composeReply', () => {
   it('quotes a related earlier thought sharing a significant word', () => {
     const existing = [mk('sagemaker costs are creeping up', 'ai-engineering')];
     const reply = composeReply(mk('check the sagemaker quota', 'ai-engineering'), ctx(existing));
-    expect(reply).toContain('connects with an earlier note');
+    expect(reply).toContain('Ties back to');
     expect(reply).toContain('sagemaker costs');
   });
 });
@@ -126,5 +127,25 @@ describe('findRelated', () => {
   it('excludes the thought itself', () => {
     const self = mk('sagemaker endpoint tuning');
     expect(findRelated(self.text, [self], self.id)).toBeUndefined();
+  });
+});
+
+describe('bootGreeting', () => {
+  it('uses the real thought count', () => {
+    expect(bootGreeting(42, undefined, 0)).toBe('42 thoughts in here. Ambitious of you to call this a brain.');
+  });
+
+  it('has a dedicated empty-brain line', () => {
+    expect(bootGreeting(0, 'Sahil')).toBe('Empty. Zero thoughts — bold starting position, Sahil.');
+  });
+
+  it('drops the name in occasionally, not every line', () => {
+    expect(bootGreeting(5, 'Sahil', 0.3)).toContain('Sahil');
+    expect(bootGreeting(5, 'Sahil', 0)).not.toContain('Sahil');
+  });
+
+  it('varies the ribbing across the random range', () => {
+    const lines = new Set([0, 0.3, 0.6, 0.9].map((r) => bootGreeting(7, undefined, r)));
+    expect(lines.size).toBe(4);
   });
 });

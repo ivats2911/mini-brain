@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { nanoid } from 'nanoid';
 import { db, deleteCategory, mergeSeedKeywords } from '../db/db';
 import { INBOX_ID, type CategoryRule } from '../categorization/rules';
+import {
+  DEFAULT_MODELS,
+  describeError,
+  loadAISettings,
+  saveAISettings,
+  testAIConnection,
+  type AIProvider,
+  type AISettings,
+} from '../assistant/llm';
 
 const WEIGHTS = [1, 2, 3] as const;
 
@@ -28,11 +37,104 @@ export function RulesEditor({ rules }: { rules: CategoryRule[] }) {
         </button>
         {mergeMsg && <span className="text-zinc-500">{mergeMsg}</span>}
       </div>
+      <AISettingsPanel />
       {rules.map((rule) => (
         <RuleCard key={rule.id} rule={rule} />
       ))}
       <AddCategory />
     </div>
+  );
+}
+
+function AISettingsPanel() {
+  const [settings, setSettings] = useState<AISettings>(() => loadAISettings());
+  const [testState, setTestState] = useState<{ kind: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({
+    kind: 'idle',
+  });
+
+  const update = (patch: Partial<AISettings>) => {
+    const next = { ...settings, ...patch };
+    if (patch.provider && patch.provider !== settings.provider) {
+      next.model = DEFAULT_MODELS[patch.provider];
+    }
+    if (typeof next.apiKey === 'string') next.apiKey = next.apiKey.trim();
+    setSettings(next);
+    saveAISettings(next);
+    setTestState({ kind: 'idle' });
+  };
+
+  const runTest = () => {
+    setTestState({ kind: 'testing' });
+    testAIConnection(settings)
+      .then((text) => setTestState({ kind: 'ok', message: `Key works — model said “${text.slice(0, 40)}”.` }))
+      .catch((err: unknown) => setTestState({ kind: 'error', message: describeError(err) }));
+  };
+
+  const inputCls =
+    'rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs outline-none transition-colors focus:border-cyan-400/30';
+
+  return (
+    <section className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-sm font-medium tracking-wide">🧠 AI voice replies</span>
+        <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-zinc-400">
+          <input
+            type="checkbox"
+            checked={settings.enabled}
+            onChange={(e) => update({ enabled: e.target.checked })}
+            className="accent-cyan-400"
+          />
+          {settings.enabled ? 'on' : 'off'}
+        </label>
+      </div>
+      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+        When on, each captured thought (plus recent thoughts for context) is sent from this browser straight to the
+        provider, and the reply is spoken by the same voice. Costs per use on your key. The key is stored only in this
+        browser. When off — or if a call fails — the offline assistant answers instead.
+      </p>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <select
+          value={settings.provider}
+          onChange={(e) => update({ provider: e.target.value as AIProvider })}
+          className={inputCls}
+          title="Provider"
+        >
+          <option value="openai">OpenAI (ChatGPT)</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+        </select>
+        <input
+          value={settings.model}
+          onChange={(e) => update({ model: e.target.value })}
+          placeholder={DEFAULT_MODELS[settings.provider]}
+          className={`${inputCls} w-44`}
+          title="Model id"
+        />
+        <input
+          type="password"
+          value={settings.apiKey}
+          onChange={(e) => update({ apiKey: e.target.value })}
+          placeholder={settings.provider === 'openai' ? 'sk-… API key' : 'sk-ant-… API key'}
+          autoComplete="off"
+          className={`${inputCls} min-w-52 flex-1`}
+          title="API key (stored only in this browser)"
+        />
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-xs">
+        <button
+          onClick={runTest}
+          disabled={!settings.apiKey.trim() || testState.kind === 'testing'}
+          className="rounded-md border border-white/10 px-2.5 py-1 text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+          title="Send one tiny request to verify key + model"
+        >
+          {testState.kind === 'testing' ? 'Testing…' : '⚡ Test key'}
+        </button>
+        {testState.kind === 'ok' && <span className="text-emerald-400/90">✓ {testState.message}</span>}
+        {testState.kind === 'error' && <span className="text-red-400/90">✗ {testState.message}</span>}
+      </div>
+      {settings.enabled && !settings.apiKey.trim() && (
+        <p className="mt-2 text-xs text-amber-400/80">No API key yet — the offline assistant will keep answering.</p>
+      )}
+    </section>
   );
 }
 

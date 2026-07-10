@@ -4,9 +4,14 @@ import { significantWords } from '../graph/buildGraph';
 import type { Thought } from '../types';
 
 /**
- * Offline rule-based assistant: composes a short, actionable spoken reply for
- * every captured thought. No LLM, no network — intent heuristics + per-category
+ * Offline rule-based assistant: composes a short, actionable reply for every
+ * captured thought. No LLM, no network — intent heuristics + per-category
  * advice templates + related-thought lookup. Pure module, unit-tested.
+ *
+ * Persona: the voice of the brain itself — a dry, technically-literate
+ * version of the user. Economical, deadpan, zero filler. One good line beats
+ * three bland ones. Rib, never gush. It's templated wit, so every line here
+ * has to earn its place.
  */
 
 export type Intent = 'question' | 'task' | 'idea' | 'note';
@@ -46,34 +51,34 @@ type Playbook = {
 };
 
 /**
- * Concrete, content-aware plans keyed on the action verb. The follow-up
- * question invites the user to answer by capturing another thought.
+ * Concrete plans keyed on the action verb. The follow-up question invites the
+ * user to answer by capturing another thought.
  */
 const PLAYBOOKS: Playbook[] = [
   {
     pattern: /\b(?:buy|order|purchase)\s+(.{3,60})/i,
-    suggestion: (s) => `For the ${s}: compare two or three options, set a price cap, then order from your usual store.`,
-    question: (s) => `Which ${s} model, and what's your budget? Say it and I'll capture it.`,
+    suggestion: (s) => `${s}: two or three options, a price cap, order. Not a research project.`,
+    question: () => `Model and budget — say it, I'll file it.`,
   },
   {
     pattern: /\b(?:call|email|message|text|contact)\s+(.{2,60})/i,
-    suggestion: (s) => `Draft the first line to ${s} now — starting is the hard part.`,
-    question: () => 'When will you send it? Say the day and I\'ll log it.',
+    suggestion: (s) => `Draft the first line to ${s} now. That's the whole battle.`,
+    question: () => `When's it going out?`,
   },
   {
     pattern: /\b(?:fix|debug|refactor|finish|build|improve)\s+(.{3,60})/i,
-    suggestion: (s) => `Break ${s} into a first fifteen-minute step and do only that.`,
-    question: () => "What's step one? Say it and I'll capture it.",
+    suggestion: (s) => `First fifteen-minute step on ${s}. Just that one.`,
+    question: () => `What's step one?`,
   },
   {
     pattern: /\b(?:watch|read|learn|study|research)\s+(.{3,60})/i,
-    suggestion: (s) => `Give ${s} a twenty-minute slot — small enough to actually happen.`,
-    question: () => 'Which evening this week? Tell me and I\'ll note it.',
+    suggestion: (s) => `Twenty minutes on ${s} — small enough to survive contact with your calendar.`,
+    question: () => `Which evening?`,
   },
   {
     pattern: /\b(?:book|schedule|renew|register for)\s+(.{3,60})/i,
-    suggestion: (s) => `${s} is two minutes of calendar work — do it now or pin a date.`,
-    question: () => 'Which day works? Say it and I\'ll log the deadline.',
+    suggestion: (s) => `${s} is two minutes of admin. Do it now or pin the date.`,
+    question: () => `Which day?`,
   },
 ];
 
@@ -88,52 +93,52 @@ function findPlaybook(text: string): { suggestion: string; question: string } | 
   return undefined;
 }
 
-/** Fallback follow-up question when no playbook matched. Notes get none. */
-const INTENT_QUESTION: Record<Intent, string | null> = {
-  question: "What are the two options you're weighing? Say them and I'll log both.",
-  task: 'When do you want it done by? Tell me and I\'ll note the deadline.',
-  idea: "What would version zero look like? Say it while it's fresh.",
-  note: null,
-};
-
 const CATEGORY_ADVICE: Record<string, Record<Intent, string>> = {
   'ai-engineering': {
-    question: 'Spike it: time-box a thirty-minute experiment and capture the answer back here.',
-    task: 'Define the eval before touching the model, so you know when you are done.',
-    idea: 'Log the baseline first, then try it — ideas without baselines are just vibes.',
-    note: 'Worth a line in your experiment log while the context is fresh.',
+    question: 'Time-box a thirty-minute spike. Opinions are free; data costs half an hour.',
+    task: 'Define the eval first, or "done" stays a vibe.',
+    idea: 'Baseline first, then the clever bit. In that order.',
+    note: 'Put it in the experiment log before the context evaporates.',
   },
   youtube: {
-    question: 'Check the data before guessing — score the title, then decide.',
-    task: 'Slot it against your Monday-Wednesday-Friday cadence so it actually ships.',
-    idea: 'Draft the hook first — the first two seconds decide retention.',
-    note: 'If it could be a Short, write the on-screen text now while it is vivid.',
+    question: 'Score it before you overthink it. The data does not care about your gut.',
+    task: 'Pin it to Monday, Wednesday or Friday, or it joins the graveyard of later.',
+    idea: 'Hook first. Nobody watches second two if second one is boring.',
+    note: 'If it could be a Short, write the on-screen text now. Future you is lazier.',
   },
   pod: {
-    question: 'Search the niche before you decide — demand first, design second.',
-    task: 'Batch it into your next design session instead of context-switching now.',
-    idea: 'Mock it up in Ideogram and sleep on it before you list it.',
-    note: 'Tag it to a niche so you can find it when you batch designs.',
+    question: 'Demand first, design second. The other order is how stores die.',
+    task: 'Batch it with the next design session. Context switches are not free.',
+    idea: 'Mock it in Ideogram and sleep on it. The good half survives the night.',
+    note: 'Tag the niche or you will never find it again.',
   },
   'job-search': {
-    question: 'Answer it by doing: one application or one follow-up today.',
-    task: 'Do it today — momentum beats polish in a job search.',
-    idea: 'Fold it into your portfolio or your next outreach message.',
-    note: 'Add the concrete next step: who to contact, and by when.',
+    question: 'One application answers more than a week of wondering.',
+    task: 'Today. Momentum beats polish in a job hunt.',
+    idea: 'Portfolio or outreach — pick where it lands.',
+    note: 'Add the who and the when, or it is just a mood.',
   },
   personal: {
-    question: 'Sleep on it, but set a date to decide.',
-    task: 'Give it a time slot in your calendar, or it will not happen.',
-    idea: 'Nice one — pin a weekend for it.',
-    note: 'Logged. Protect the habit that goes with it.',
+    question: 'Sleep on it. Set a date to stop sleeping on it.',
+    task: 'Calendar slot or it does not exist.',
+    idea: 'Pin a weekend to it.',
+    note: 'Noted. Guard the habit.',
   },
 };
 
 const GENERIC_ADVICE: Record<Intent, string> = {
-  question: 'Turn it into one concrete next step and capture that too.',
-  task: 'Give it a deadline so it does not rot here.',
-  idea: 'Add one more detail while it is fresh — future you will thank you.',
-  note: 'Saved. It will come back around in your weekly review.',
+  question: 'Turn it into one next step and file that too.',
+  task: 'Deadline, or it rots here.',
+  idea: 'One more detail while it is fresh.',
+  note: 'Filed. The weekly review can deal with it.',
+};
+
+/** Fallback follow-up question when no playbook matched. Notes get none. */
+const INTENT_QUESTION: Record<Intent, string | null> = {
+  question: "What are the two options? Say them, I'll hold both.",
+  task: "When by? Tell me and I'll file the deadline.",
+  idea: "What's version zero? Say it while it's warm.",
+  note: null,
 };
 
 function truncate(text: string, max: number): string {
@@ -166,12 +171,12 @@ function inboxLine(rules: CategoryRule[], result?: CategorizationResult): string
       const name = (id: string) => rules.find((r) => r.id === id)?.name ?? id;
       const tied = entries.filter(([, s]) => s === top[1]);
       if (tied.length > 1) {
-        return `Went to Inbox — it tied between ${name(tied[0][0])} and ${name(tied[1][0])}; tap the pill to pick one.`;
+        return `Inbox — ${name(tied[0][0])} and ${name(tied[1][0])} tied, and I don't do coin flips. The pill's right there.`;
       }
-      return `Went to Inbox — ${name(top[0])} was closest but scored under the bar; add a stronger keyword to ${name(top[0])} in Rules and this sorts itself next time.`;
+      return `Inbox — ${name(top[0])} came closest but missed the bar. One decent keyword in Rules fixes that.`;
     }
   }
-  return 'Went to Inbox — no keywords matched; tap the pill to reassign it, or teach me a keyword in Rules.';
+  return 'Inbox. Nothing matched — teach me a keyword in Rules, or enjoy the mystery pile.';
 }
 
 export type ComposeOptions = {
@@ -192,7 +197,7 @@ export function composeReply(thought: Thought, ctx: AssistantContext, opts: Comp
   if (thought.categoryId === INBOX_ID) {
     parts.push(inboxLine(ctx.rules, opts.result));
   } else {
-    parts.push(`Filed under ${name} — ${count === 1 ? 'your first one there' : `number ${count} there`}.`);
+    parts.push(`${name}. ${count === 1 ? 'First one — historic.' : `Number ${count}.`}`);
   }
 
   if (opts.brief) return parts[0];
@@ -205,10 +210,27 @@ export function composeReply(thought: Thought, ctx: AssistantContext, opts: Comp
   }
 
   const related = findRelated(thought.text, ctx.thoughts, thought.id);
-  if (related) parts.push(`It connects with an earlier note: “${truncate(related.text, 70)}”.`);
+  if (related) parts.push(`Ties back to “${truncate(related.text, 70)}”. You have a theme.`);
 
   const question = playbook ? playbook.question : INTENT_QUESTION[intent];
   if (question) parts.push(question);
 
   return parts.join(' ');
+}
+
+/**
+ * One dry line on page load, with the real thought count. `rand` is
+ * injectable so tests stay deterministic.
+ */
+export function bootGreeting(count: number, name?: string, rand: number = Math.random()): string {
+  if (count === 0) {
+    return `Empty. Zero thoughts — bold starting position${name ? `, ${name}` : ''}.`;
+  }
+  const variants = [
+    `${count} thought${count === 1 ? '' : 's'} in here. Ambitious of you to call this a brain.`,
+    `${count} thought${count === 1 ? '' : 's'} on file${name ? `, ${name}` : ''}. I've read them all. We should talk about the Inbox.`,
+    `Back again. ${count} thought${count === 1 ? '' : 's'}, none of them about finishing the last one.`,
+    `${count} in the vault. Say something worth filing.`,
+  ];
+  return variants[Math.min(variants.length - 1, Math.floor(rand * variants.length))];
 }

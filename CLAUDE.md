@@ -96,6 +96,7 @@ src/
     backup.ts              JSON export / merge-import with runtime validation
   assistant/
     assistant.ts           offline rule-based reply engine (intent + advice, unit-tested)
+    llm.ts                 opt-in LLM replies (OpenAI/Anthropic via browser fetch, unit-tested prompts)
   voice/
     speech.d.ts            Web Speech API type declarations (not in TS DOM lib)
     useVoiceCapture.ts     continuous hands-free dictation hook (pause/resume for echo guard)
@@ -104,6 +105,8 @@ src/
     BrainView                floating category bubbles (default view, see below)
     CaptureBox, CategoryTabs, Feed, ThoughtCard, RulesEditor, Toast
   utils/time.ts            relative timestamps
+server/capture.mjs         capture bridge (Telegram bot + generic POST /capture; no deps)
+docs/phone-capture.md      Telegram + OpenClaw setup for phone capture
   App.tsx                  state owner: live queries, shortcuts, toasts, view toggle
 ```
 
@@ -151,14 +154,42 @@ closest category) so rule tuning is never guesswork.
 
 Every captured thought (typed or dictated) gets a short actionable reply, shown in the
 AssistantBar under the capture box and spoken aloud via `speechSynthesis` — **offline and
-rule-based, no LLM/network**. `composeReply` = category line + count, intent-matched advice
+rule-based, no LLM/network**.
+
+**AI mode (opt-in)** (`assistant/llm.ts`): the ⚙ Rules panel has an "AI voice replies" section —
+provider (OpenAI default `gpt-4o-mini`, or Anthropic default `claude-opus-4-8`), model id, and
+API key (localStorage only, never leaves the browser except to the provider). When enabled with
+a key, each captured thought + up to 15 recent thoughts (category-labelled, truncated) goes to
+the provider with the persona as system prompt; the reply is spoken by the same browser voice.
+This is the ONE feature that breaks the app's offline/no-cloud rule, deliberately opt-in.
+Anthropic calls are raw fetch with the `anthropic-dangerous-direct-browser-access: true` header
+(required for browser CORS); no sampling params (removed on Opus 4.8). Any failure or missing
+key falls back to the offline rule-based reply with a diagnosed "(AI failed: …)" note — errors
+are mapped to human causes (401 invalid key, 429 no credit, 404 bad model, abort → timeout,
+TypeError → network). A "⚡ Test key" button in the panel fires one tiny round-trip and shows
+the diagnosis inline. **On the dev server, calls go through a same-origin Vite proxy**
+(`/ai-proxy/*` in vite.config.ts) because a cross-origin `authorization` header is blocked in
+some environments (observed: embedded preview browsers; also some corporate proxies);
+production builds call the providers directly. 20s timeout via AbortController.
+
+**Persona**: the assistant speaks as the brain itself — a dry, deadpan, technically-literate
+version of the user (Sahil). Short sentences, zero filler openers, ribbing not gushing. All
+wit is templated in `assistant.ts`, so edits to tone happen there and must keep lines short
+(they're spoken). A `bootGreeting(count, name?, rand?)` fires once on load with the real
+thought count (text-only — audio is gesture-gated); `rand` is injectable for deterministic
+tests. The name appears in some greeting variants only, per the "occasionally, not every
+line" rule. `composeReply` = category line + count, intent-matched advice
 (`detectIntent`: idea → question → task → note, in that order — "what if" is an idea before
 the question heuristic fires), and a quote from the most recent earlier thought sharing a
 significant word (≥5 chars). Inbox saves get a "teach me in Rules" message instead of advice.
 `useSpeaker` prefers a Google en-GB voice (async `voiceschanged`), primes audio with a silent
 utterance on the first pointer/key gesture (browser autoplay gate), and persists the 🔊/🔇
 preference in localStorage. Status line shows ● listening / thinking / speaking (thinking is a
-600 ms staged delay — replies are actually instant). **Echo guard**: while the app speaks,
+600 ms staged delay — replies are actually instant). The AssistantBar's 💬 talk / ⚡ brief
+toggle (persisted, default chatty) decides how much of the reply is *spoken* after a dictated
+thought: chatty talks the full reply through (filing + advice + connection + question); brief
+speaks only the filing line so rapid brain-dumps aren't interrupted. Typed thoughts always
+get the full reply spoken. The bar always shows the full text either way. **Echo guard**: while the app speaks,
 `useVoiceCapture.pause()` aborts recognition and drops the buffer so the mic never transcribes
 the app's own voice; `resume()` restarts it when speech ends.
 
@@ -176,6 +207,16 @@ the app's own voice; `resume()` restarts it when speech ends.
 
 Ctrl+Enter save (capture + card edit), Ctrl+K refocus capture from anywhere, Ctrl+M toggle
 voice, Esc cancels a card edit.
+
+### Phone capture bridge (`server/capture.mjs`, `npm run bridge`)
+
+Thoughts can arrive from outside the browser: a dependency-free Node server on
+`127.0.0.1:4820` queues them to `server/inbox.json` (`POST /capture` / `GET /pending` /
+`POST /ack`). Optional Telegram bot via long polling (`TELEGRAM_BOT_TOKEN`, lock with
+`TELEGRAM_CHAT_ID`); OpenClaw or anything else can POST to the same endpoint (docs in
+`docs/phone-capture.md`). The app polls `/ingest/pending` (Vite proxy → 4820) every 15 s and
+on focus, categorizes, imports with dedupe by bridge id, `source: 'remote'` (📨 badge), and
+toasts arrivals. Bridge offline = silent no-op. `ThoughtSource` is `typed | voice | remote`.
 
 ### Export / import (`db/backup.ts`)
 

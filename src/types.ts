@@ -1,4 +1,4 @@
-export type ThoughtSource = 'typed' | 'voice';
+export type ThoughtSource = 'typed' | 'voice' | 'remote';
 export type CategorySource = 'auto' | 'manual';
 
 export type Thought = {

@@ -8,7 +8,8 @@ import { INBOX_ID } from './categorization/rules';
 import type { Thought } from './types';
 import { useVoiceCapture } from './voice/useVoiceCapture';
 import { useSpeaker } from './voice/useSpeaker';
-import { composeReply } from './assistant/assistant';
+import { bootGreeting, composeReply } from './assistant/assistant';
+import { buildSystemPrompt, buildUserPrompt, describeError, generateReply, loadAISettings } from './assistant/llm';
 import { AssistantBar, type AssistantStatus } from './components/AssistantBar';
 import { BrainView } from './components/BrainView';
 import { MapView } from './components/MapView';
@@ -32,6 +33,15 @@ export default function App() {
   const [assistantReply, setAssistantReply] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const thinkTimerRef = useRef<number | null>(null);
+  const greetedRef = useRef(false);
+  // 'chatty' speaks the full reply after a dictated thought; 'brief' just the filing line.
+  const [replyStyle, setReplyStyle] = useState<'chatty' | 'brief'>(() => {
+    try {
+      return localStorage.getItem('mini-brain:reply-style') === 'brief' ? 'brief' : 'chatty';
+    } catch {
+      return 'chatty';
+    }
+  });
 
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,13 +79,35 @@ export default function App() {
       setLastSaved({ thought, at: Date.now() });
 
       // Assistant: compose an actionable reply, show it, and speak it.
-      // Voice mode gets a one-sentence spoken confirmation — the mic is muted
-      // while the app talks, so long speeches would swallow the next thought.
+      // In brief style, dictated thoughts get a one-sentence confirmation —
+      // the mic is muted while the app talks, so long speeches would swallow
+      // a rapid brain-dump. Chatty style talks the whole reply through.
       const ctx = { rules: rules ?? [], thoughts: thoughts ?? [] };
       const reply = composeReply(thought, ctx, { result });
-      const spoken = source === 'voice' ? composeReply(thought, ctx, { result, brief: true }) : reply;
+      const spoken =
+        source === 'voice' && replyStyle === 'brief' ? composeReply(thought, ctx, { result, brief: true }) : reply;
       setThinking(true);
       if (thinkTimerRef.current !== null) window.clearTimeout(thinkTimerRef.current);
+
+      // AI mode (opt-in, Rules panel): send the thought + recent context to the
+      // configured LLM for a genuinely conversational reply, spoken by the same
+      // browser voice. Falls back to the offline rule-based reply on any error.
+      const ai = loadAISettings();
+      if (ai.enabled && ai.apiKey.trim()) {
+        generateReply(ai, buildSystemPrompt('Sahil'), buildUserPrompt(thought, ctx))
+          .then((aiText) => {
+            setThinking(false);
+            setAssistantReply(aiText);
+            if (speaker.enabled) speaker.speak(aiText);
+          })
+          .catch((err: unknown) => {
+            setThinking(false);
+            setAssistantReply(`${reply} (AI failed: ${describeError(err)} — offline brain speaking.)`);
+            if (speaker.enabled) speaker.speak(spoken);
+          });
+        return;
+      }
+
       thinkTimerRef.current = window.setTimeout(() => {
         thinkTimerRef.current = null;
         setThinking(false);
@@ -83,7 +115,7 @@ export default function App() {
         if (speaker.enabled) speaker.speak(spoken);
       }, 600);
     },
-    [rules, thoughts, speaker],
+    [rules, thoughts, speaker, replyStyle],
   );
 
   const voice = useVoiceCapture({
@@ -109,6 +141,67 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [voiceToggle]);
+
+  // Capture bridge: pull thoughts queued by server/capture.mjs (Telegram,
+  // OpenClaw, curl — anything that POSTs to it), categorize, and import with
+  // dedupe by bridge id. Silent when the bridge isn't running.
+  useEffect(() => {
+    if (rules === undefined) return;
+    const base = import.meta.env.DEV ? '/ingest' : 'http://127.0.0.1:4820';
+    let busy = false;
+    const pull = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const res = await fetch(`${base}/pending`);
+        if (!res.ok) return;
+        const items = (await res.json()) as { id?: string; text?: string; via?: string; receivedAt?: number }[];
+        if (!Array.isArray(items) || items.length === 0) return;
+        const existing = new Set<string>(await db.thoughts.toCollection().primaryKeys());
+        const fresh = items.filter(
+          (i): i is { id: string; text: string; via?: string; receivedAt?: number } =>
+            typeof i.id === 'string' && typeof i.text === 'string' && i.text.trim() !== '' && !existing.has(i.id),
+        );
+        const added: Thought[] = fresh.map((i) => ({
+          id: i.id,
+          text: i.text.trim(),
+          categoryId: categorize(i.text, rules).categoryId,
+          categorySource: 'auto',
+          createdAt: typeof i.receivedAt === 'number' ? i.receivedAt : Date.now(),
+          source: 'remote',
+        }));
+        if (added.length > 0) await db.thoughts.bulkAdd(added);
+        await fetch(`${base}/ack`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ids: items.map((i) => i.id) }),
+        });
+        if (added.length > 0) {
+          setToast({ kind: 'info', message: `📨 ${added.length} thought${added.length === 1 ? '' : 's'} arrived from your phone` });
+        }
+      } catch {
+        // bridge not running — that's fine
+      } finally {
+        busy = false;
+      }
+    };
+    void pull();
+    const iv = window.setInterval(() => void pull(), 15_000);
+    const onFocus = () => void pull();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(iv);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [rules]);
+
+  // Boot greeting: one dry line with the real count, once thoughts have loaded.
+  // Text only — the browser blocks audio before the first user gesture anyway.
+  useEffect(() => {
+    if (greetedRef.current || thoughts === undefined) return;
+    greetedRef.current = true;
+    setAssistantReply(bootGreeting(thoughts.length, 'Sahil'));
+  }, [thoughts]);
 
   // Mute the mic while the app speaks so it never transcribes its own voice.
   const voicePause = voice.pause;
@@ -269,7 +362,17 @@ export default function App() {
         reply={assistantReply}
         speechSupported={speaker.supported}
         speechEnabled={speaker.enabled}
+        replyStyle={replyStyle}
         onToggleSpeech={() => speaker.setEnabled(!speaker.enabled)}
+        onToggleStyle={() => {
+          const next = replyStyle === 'chatty' ? 'brief' : 'chatty';
+          setReplyStyle(next);
+          try {
+            localStorage.setItem('mini-brain:reply-style', next);
+          } catch {
+            // preference just won't persist
+          }
+        }}
         onDismiss={() => {
           setAssistantReply(null);
           speaker.cancel();

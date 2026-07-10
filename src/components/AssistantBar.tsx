@@ -5,7 +5,9 @@ type Props = {
   reply: string | null;
   speechSupported: boolean;
   speechEnabled: boolean;
+  replyStyle: 'chatty' | 'brief';
   onToggleSpeech: () => void;
+  onToggleStyle: () => void;
   onDismiss: () => void;
 };
 
@@ -15,7 +17,16 @@ const DOT: Record<Exclude<AssistantStatus, 'idle'>, string> = {
   speaking: 'bg-cyan-400',
 };
 
-export function AssistantBar({ status, reply, speechSupported, speechEnabled, onToggleSpeech, onDismiss }: Props) {
+export function AssistantBar({
+  status,
+  reply,
+  speechSupported,
+  speechEnabled,
+  replyStyle,
+  onToggleSpeech,
+  onToggleStyle,
+  onDismiss,
+}: Props) {
   if (status === 'idle' && !reply) return null;
   return (
     <div className="toast-in pointer-events-auto mb-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 backdrop-blur-xl">
@@ -30,6 +41,17 @@ export function AssistantBar({ status, reply, speechSupported, speechEnabled, on
         )}
         {!speechSupported && <span className="text-amber-400/80">voice output unavailable in this browser</span>}
         <span className="ml-auto flex items-center gap-1">
+          <button
+            onClick={onToggleStyle}
+            className="rounded px-1.5 py-0.5 transition-colors hover:bg-white/5"
+            title={
+              replyStyle === 'chatty'
+                ? 'Talk mode: speaks the full reply after a voice thought. Click for brief mode.'
+                : 'Brief mode: quick spoken confirmation, better for rapid brain-dumps. Click for talk mode.'
+            }
+          >
+            {replyStyle === 'chatty' ? '💬 talk' : '⚡ brief'}
+          </button>
           <button
             onClick={onToggleSpeech}
             className="rounded px-1.5 py-0.5 transition-colors hover:bg-white/5"

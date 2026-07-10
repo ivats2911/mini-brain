@@ -111,6 +111,7 @@ export function ThoughtCard({ thought, rule, rules, onDelete, onEdit, onReassign
         </span>
         <span title={new Date(thought.createdAt).toLocaleString()}>{formatRelative(thought.createdAt)}</span>
         {thought.source === 'voice' && <span title="Captured by voice">🎤</span>}
+        {thought.source === 'remote' && <span title="Arrived from your phone">📨</span>}
         <span className="ml-auto flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <button
             onClick={() => {
