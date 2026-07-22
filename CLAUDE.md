@@ -196,9 +196,15 @@ line" rule. `composeReply` = category line + count, intent-matched advice
 (`detectIntent`: idea → question → task → note, in that order — "what if" is an idea before
 the question heuristic fires), and a quote from the most recent earlier thought sharing a
 significant word (≥5 chars). Inbox saves get a "teach me in Rules" message instead of advice.
-`useSpeaker` prefers a Google en-GB voice (async `voiceschanged`), primes audio with a silent
-utterance on the first pointer/key gesture (browser autoplay gate), and persists the 🔊/🔇
-preference in localStorage. Status line shows ● listening / thinking / speaking (thinking is a
+`useSpeaker` defaults to the most natural **female** English voice the browser exposes and lets
+the user pick another. Voice selection is a pure, unit-tested scorer (`voice/pickVoice.ts`):
+English-only, female name fragments +6 (checked before the male list so "male" inside "female"
+never counts against it), network/non-local +4, natural-engine names (google/natural/neural/…)
++3, en-GB +2. So on real Chrome it auto-selects "Google UK English Female"; on a bare Windows
+box it picks "Microsoft Zira" over David/Mark. The VoicePanel shows a voice `<select>` (best-first)
++ a "▶ Hear" preview; the choice persists in localStorage (`mini-brain:voice`). Rate 0.97 /
+pitch 1.06 for a warmer, less clipped cadence. Primes audio with a silent utterance on the first
+pointer/key gesture (browser autoplay gate); 🔊/🔇 preference persists too. Status line shows ● listening / thinking / speaking (thinking is a
 600 ms staged delay — replies are actually instant). The AssistantBar's 💬 talk / ⚡ brief
 toggle (persisted, default chatty) decides how much of the reply is *spoken* after a dictated
 thought: chatty talks the full reply through (filing + advice + connection + question); brief

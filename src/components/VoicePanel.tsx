@@ -9,6 +9,10 @@ type Props = {
   speechSupported: boolean;
   speechEnabled: boolean;
   replyStyle: 'chatty' | 'brief';
+  voices: SpeechSynthesisVoice[];
+  voiceURI: string | null;
+  onVoiceChange: (uri: string) => void;
+  onPreviewVoice: () => void;
   onToggleSpeech: () => void;
   onToggleStyle: () => void;
   onDismiss: () => void;
@@ -34,6 +38,10 @@ export function VoicePanel({
   speechSupported,
   speechEnabled,
   replyStyle,
+  voices,
+  voiceURI,
+  onVoiceChange,
+  onPreviewVoice,
   onToggleSpeech,
   onToggleStyle,
   onDismiss,
@@ -114,6 +122,32 @@ export function VoicePanel({
           </button>
         </div>
       </div>
+
+      {/* Voice picker — choose and preview the speaking voice */}
+      {speechSupported && speechEnabled && voices.length > 0 && (
+        <div className="flex items-center gap-2 border-t border-white/[0.06] px-5 py-2 text-xs text-zinc-400">
+          <span className="shrink-0">🗣 Voice</span>
+          <select
+            value={voiceURI ?? ''}
+            onChange={(e) => onVoiceChange(e.target.value)}
+            aria-label="Choose the assistant's voice"
+            className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/30 px-2 py-1 outline-none transition-colors focus:border-cyan-400/30"
+          >
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name} ({v.lang}){v.localService ? '' : ' · online'}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={onPreviewVoice}
+            className="shrink-0 rounded-md border border-white/10 px-2 py-1 text-zinc-300 transition-colors hover:bg-white/5"
+            title="Hear this voice"
+          >
+            ▶ Hear
+          </button>
+        </div>
+      )}
 
       {/* Live transcript while speaking */}
       {listening && (voice.finalText || voice.interimText) && (

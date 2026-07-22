@@ -385,6 +385,10 @@ export default function App() {
         speechSupported={speaker.supported}
         speechEnabled={speaker.enabled}
         replyStyle={replyStyle}
+        voices={speaker.voices}
+        voiceURI={speaker.voiceURI}
+        onVoiceChange={speaker.setVoiceURI}
+        onPreviewVoice={() => speaker.speak(`Hi ${name || 'there'}, this is how I'll sound. Just say what's on your mind.`)}
         onToggleSpeech={() => speaker.setEnabled(!speaker.enabled)}
         onToggleStyle={() => {
           const next = replyStyle === 'chatty' ? 'brief' : 'chatty';
