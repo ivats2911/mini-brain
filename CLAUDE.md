@@ -172,6 +172,20 @@ the diagnosis inline. **On the dev server, calls go through a same-origin Vite p
 some environments (observed: embedded preview browsers; also some corporate proxies);
 production builds call the providers directly. 20s timeout via AbortController.
 
+**Onboarding & daily welcome** (`src/profile.ts`, `components/Onboarding.tsx`): first run shows a
+modal asking what to call the user (name stored in localStorage, sanitized, editable in ⚙ Rules
+via the NameCard). `shouldWelcomeToday`/`markWelcomedToday` track a per-local-day stamp so the
+first visit each calendar day gets a warm `dailyWelcome(name, count, firstEver)` line; later
+visits the same day get the dry `bootGreeting`. The name drives the persona (`buildSystemPrompt`)
+and greetings — no longer hardcoded.
+
+**Voice hero** (`components/VoicePanel.tsx`): the mic moved out of the CaptureBox footer into a
+prominent standalone panel above the (now typing-only) capture box — big tappable mic orb with
+radiating rings while listening, personalized invite copy, status chip (listening/thinking/
+speaking), live transcript, and the assistant reply shown inline as a conversation. Replaces the
+old AssistantBar (still exports the `AssistantStatus` type). Accessible: aria-pressed mic,
+aria-live regions, focus-visible ring, reduced-motion honored.
+
 **Persona**: the assistant speaks as the brain itself — a dry, deadpan, technically-literate
 version of the user (Sahil). Short sentences, zero filler openers, ribbing not gushing. All
 wit is templated in `assistant.ts`, so edits to tone happen there and must keep lines short

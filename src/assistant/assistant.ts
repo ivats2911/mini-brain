@@ -234,3 +234,25 @@ export function bootGreeting(count: number, name?: string, rand: number = Math.r
   ];
   return variants[Math.min(variants.length - 1, Math.floor(rand * variants.length))];
 }
+
+/**
+ * Warm once-per-day welcome, shown on the first visit of each calendar day.
+ * `firstEver` softens the tone for a brand-new user who just told us their
+ * name. `rand` is injectable so tests stay deterministic.
+ */
+export function dailyWelcome(name: string, count: number, firstEver: boolean, rand: number = Math.random()): string {
+  const who = name || 'you';
+  if (firstEver) {
+    return `Good to meet you, ${who}. This is where the noise in your head comes to land — type it, or just hit the mic and talk. I'll sort the rest.`;
+  }
+  if (count === 0) {
+    return `Welcome back, ${who}. Blank slate today. What's rattling around up there?`;
+  }
+  const variants = [
+    `Welcome back, ${who}. ${count} thought${count === 1 ? '' : 's'} waiting. What's on your mind now?`,
+    `There you are, ${who}. The brain kept your ${count} thought${count === 1 ? '' : 's'} exactly where you left them. Add another.`,
+    `Morning, ${who} — or whenever this is. ${count} filed so far. Talk to me.`,
+    `Back for more, ${who}? ${count} in here already. Go on, out with it.`,
+  ];
+  return variants[Math.min(variants.length - 1, Math.floor(rand * variants.length))];
+}

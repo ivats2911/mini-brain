@@ -8,9 +8,12 @@ import { INBOX_ID } from './categorization/rules';
 import type { Thought } from './types';
 import { useVoiceCapture } from './voice/useVoiceCapture';
 import { useSpeaker } from './voice/useSpeaker';
-import { bootGreeting, composeReply } from './assistant/assistant';
+import { bootGreeting, composeReply, dailyWelcome } from './assistant/assistant';
 import { buildSystemPrompt, buildUserPrompt, describeError, generateReply, loadAISettings } from './assistant/llm';
-import { AssistantBar, type AssistantStatus } from './components/AssistantBar';
+import { hasName, loadName, markWelcomedToday, saveName, shouldWelcomeToday } from './profile';
+import { type AssistantStatus } from './components/AssistantBar';
+import { VoicePanel } from './components/VoicePanel';
+import { Onboarding } from './components/Onboarding';
 import { BrainView } from './components/BrainView';
 import { MapView } from './components/MapView';
 import { CaptureBox } from './components/CaptureBox';
@@ -34,6 +37,8 @@ export default function App() {
   const [thinking, setThinking] = useState(false);
   const thinkTimerRef = useRef<number | null>(null);
   const greetedRef = useRef(false);
+  const [name, setNameState] = useState<string>(() => loadName());
+  const [needsName, setNeedsName] = useState<boolean>(() => !hasName());
   // 'chatty' speaks the full reply after a dictated thought; 'brief' just the filing line.
   const [replyStyle, setReplyStyle] = useState<'chatty' | 'brief'>(() => {
     try {
@@ -94,7 +99,7 @@ export default function App() {
       // browser voice. Falls back to the offline rule-based reply on any error.
       const ai = loadAISettings();
       if (ai.enabled && ai.apiKey.trim()) {
-        generateReply(ai, buildSystemPrompt('Sahil'), buildUserPrompt(thought, ctx))
+        generateReply(ai, buildSystemPrompt(name || 'friend'), buildUserPrompt(thought, ctx))
           .then((aiText) => {
             setThinking(false);
             setAssistantReply(aiText);
@@ -115,7 +120,7 @@ export default function App() {
         if (speaker.enabled) speaker.speak(spoken);
       }, 600);
     },
-    [rules, thoughts, speaker, replyStyle],
+    [rules, thoughts, speaker, replyStyle, name],
   );
 
   const voice = useVoiceCapture({
@@ -195,13 +200,32 @@ export default function App() {
     };
   }, [rules]);
 
-  // Boot greeting: one dry line with the real count, once thoughts have loaded.
+  // Greeting: a warm welcome on the first visit each calendar day, otherwise a
+  // dry boot line. Held until the name is set (onboarding greets instead).
   // Text only — the browser blocks audio before the first user gesture anyway.
   useEffect(() => {
-    if (greetedRef.current || thoughts === undefined) return;
+    if (greetedRef.current || thoughts === undefined || needsName) return;
     greetedRef.current = true;
-    setAssistantReply(bootGreeting(thoughts.length, 'Sahil'));
-  }, [thoughts]);
+    if (shouldWelcomeToday()) {
+      markWelcomedToday();
+      setAssistantReply(dailyWelcome(name, thoughts.length, false));
+    } else {
+      setAssistantReply(bootGreeting(thoughts.length, name));
+    }
+  }, [thoughts, needsName, name]);
+
+  const finishOnboarding = useCallback(
+    (chosen: string) => {
+      const clean = saveName(chosen);
+      setNameState(clean);
+      markWelcomedToday();
+      greetedRef.current = true;
+      setNeedsName(false);
+      setAssistantReply(dailyWelcome(clean, thoughts?.length ?? 0, true));
+      requestAnimationFrame(() => captureRef.current?.focus());
+    },
+    [thoughts],
+  );
 
   // Mute the mic while the app speaks so it never transcribes its own voice.
   const voicePause = voice.pause;
@@ -353,11 +377,9 @@ export default function App() {
         </div>
       </header>
 
-      <div className="pointer-events-auto">
-        <CaptureBox onSave={(text) => saveThought(text, 'typed')} voice={voice} inputRef={captureRef} />
-      </div>
-
-      <AssistantBar
+      <VoicePanel
+        name={name}
+        voice={voice}
         status={assistantStatus}
         reply={assistantReply}
         speechSupported={speaker.supported}
@@ -378,6 +400,10 @@ export default function App() {
           speaker.cancel();
         }}
       />
+
+      <div className="pointer-events-auto">
+        <CaptureBox onSave={(text) => saveThought(text, 'typed')} inputRef={captureRef} />
+      </div>
 
       {view === 'feed' && (
         <>
@@ -405,7 +431,17 @@ export default function App() {
         </>
       )}
 
-      {view === 'settings' && <RulesEditor rules={orderedRules} />}
+      {view === 'settings' && (
+        <RulesEditor
+          rules={orderedRules}
+          name={name}
+          onRename={(next) => {
+            const clean = saveName(next);
+            setNameState(clean);
+            setToast({ kind: 'info', message: `Got it — I'll call you ${clean}.` });
+          }}
+        />
+      )}
       </div>
 
       {toast && (
@@ -428,6 +464,8 @@ export default function App() {
           }}
         />
       )}
+
+      {needsName && <Onboarding onDone={finishOnboarding} />}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { nanoid } from 'nanoid';
 import { db, deleteCategory, mergeSeedKeywords } from '../db/db';
 import { INBOX_ID, type CategoryRule } from '../categorization/rules';
+import { sanitizeName } from '../profile';
 import {
   DEFAULT_MODELS,
   describeError,
@@ -14,10 +15,17 @@ import {
 
 const WEIGHTS = [1, 2, 3] as const;
 
-export function RulesEditor({ rules }: { rules: CategoryRule[] }) {
+type RulesEditorProps = {
+  rules: CategoryRule[];
+  name: string;
+  onRename: (name: string) => void;
+};
+
+export function RulesEditor({ rules, name, onRename }: RulesEditorProps) {
   const [mergeMsg, setMergeMsg] = useState<string | null>(null);
   return (
     <div className="space-y-3">
+      <NameCard name={name} onRename={onRename} />
       <p className="text-sm text-zinc-500">
         Categories and keywords drive auto-sorting. A thought needs a score of at least 2 to leave Inbox;
         ties also land in Inbox. Single-word keywords also match simple plurals (interview → interviews).
@@ -43,6 +51,37 @@ export function RulesEditor({ rules }: { rules: CategoryRule[] }) {
       ))}
       <AddCategory />
     </div>
+  );
+}
+
+function NameCard({ name, onRename }: { name: string; onRename: (name: string) => void }) {
+  const [value, setValue] = useState(name);
+  const clean = sanitizeName(value);
+  const dirty = clean !== name && clean.length > 0;
+  return (
+    <section className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur">
+      <div className="mb-2 text-sm font-medium tracking-wide">👋 What I call you</div>
+      <div className="flex items-center gap-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && dirty) onRename(clean);
+          }}
+          maxLength={24}
+          aria-label="Your name"
+          placeholder="A short name…"
+          className="min-w-40 flex-1 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm outline-none transition-colors focus:border-cyan-400/30"
+        />
+        <button
+          onClick={() => onRename(clean)}
+          disabled={!dirty}
+          className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Save
+        </button>
+      </div>
+    </section>
   );
 }
 

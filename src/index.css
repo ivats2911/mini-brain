@@ -91,6 +91,27 @@ body::after {
   to { opacity: 1; transform: translate(0, -50%); }
 }
 
+/* Mic orb: an outward-radiating ring while listening. */
+@keyframes mic-ring {
+  0% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.1); }
+}
+
+@keyframes mic-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45); }
+  50% { box-shadow: 0 0 0 8px rgba(244, 63, 94, 0); }
+}
+
+@keyframes mic-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* fill-mode backwards (not both) so finished animations release the
    transform property back to hover transitions and WAAPI pulses */
 .bubble-pop { animation: bubble-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
@@ -102,6 +123,11 @@ body::after {
 .toast-in { animation: toast-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards; }
 .whisper-in { animation: whisper-in 0.9s ease-out backwards; }
 .panel-right { animation: panel-right-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards; }
+.mic-ring { animation: mic-ring 1.8s ease-out infinite; }
+.mic-ring-2 { animation: mic-ring 1.8s ease-out 0.9s infinite; }
+.mic-glow { animation: mic-glow 1.8s ease-in-out infinite; }
+.mic-breathe { animation: mic-breathe 3.5s ease-in-out infinite; }
+.modal-in { animation: modal-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards; }
 
 @media (prefers-reduced-motion: reduce) {
   body::before,
@@ -113,7 +139,12 @@ body::after {
   .panel-item,
   .toast-in,
   .whisper-in,
-  .panel-right {
+  .panel-right,
+  .mic-ring,
+  .mic-ring-2,
+  .mic-glow,
+  .mic-breathe,
+  .modal-in {
     animation: none !important;
   }
 }
