@@ -11,12 +11,10 @@ import { useSpeaker } from './voice/useSpeaker';
 import { bootGreeting, composeReply, dailyWelcome } from './assistant/assistant';
 import { buildSystemPrompt, buildUserPrompt, describeError, generateReply, loadAISettings } from './assistant/llm';
 import { hasName, loadName, markWelcomedToday, saveName, shouldWelcomeToday } from './profile';
-import { type AssistantStatus } from './components/AssistantBar';
-import { VoicePanel } from './components/VoicePanel';
+import { CaptureCard, type AssistantStatus } from './components/CaptureCard';
 import { Onboarding } from './components/Onboarding';
 import { BrainView } from './components/BrainView';
 import { MapView } from './components/MapView';
-import { CaptureBox } from './components/CaptureBox';
 import { CategoryTabs } from './components/CategoryTabs';
 import { Feed } from './components/Feed';
 import { RulesEditor } from './components/RulesEditor';
@@ -377,19 +375,21 @@ export default function App() {
         </div>
       </header>
 
-      <VoicePanel
+      <CaptureCard
         name={name}
+        onSave={(text) => saveThought(text, 'typed')}
+        inputRef={captureRef}
         voice={voice}
         status={assistantStatus}
         reply={assistantReply}
+        onDismissReply={() => {
+          setAssistantReply(null);
+          speaker.cancel();
+        }}
         speechSupported={speaker.supported}
         speechEnabled={speaker.enabled}
-        replyStyle={replyStyle}
-        voices={speaker.voices}
-        voiceURI={speaker.voiceURI}
-        onVoiceChange={speaker.setVoiceURI}
-        onPreviewVoice={() => speaker.speak(`Hi ${name || 'there'}, this is how I'll sound. Just say what's on your mind.`)}
         onToggleSpeech={() => speaker.setEnabled(!speaker.enabled)}
+        replyStyle={replyStyle}
         onToggleStyle={() => {
           const next = replyStyle === 'chatty' ? 'brief' : 'chatty';
           setReplyStyle(next);
@@ -399,15 +399,11 @@ export default function App() {
             // preference just won't persist
           }
         }}
-        onDismiss={() => {
-          setAssistantReply(null);
-          speaker.cancel();
-        }}
+        voices={speaker.voices}
+        voiceURI={speaker.voiceURI}
+        onVoiceChange={speaker.setVoiceURI}
+        onPreviewVoice={() => speaker.speak(`Hi ${name || 'there'}, this is how I'll sound. Just say what's on your mind.`)}
       />
-
-      <div className="pointer-events-auto">
-        <CaptureBox onSave={(text) => saveThought(text, 'typed')} inputRef={captureRef} />
-      </div>
 
       {view === 'feed' && (
         <>

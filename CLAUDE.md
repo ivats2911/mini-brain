@@ -179,12 +179,13 @@ first visit each calendar day gets a warm `dailyWelcome(name, count, firstEver)`
 visits the same day get the dry `bootGreeting`. The name drives the persona (`buildSystemPrompt`)
 and greetings — no longer hardcoded.
 
-**Voice hero** (`components/VoicePanel.tsx`): the mic moved out of the CaptureBox footer into a
-prominent standalone panel above the (now typing-only) capture box — big tappable mic orb with
-radiating rings while listening, personalized invite copy, status chip (listening/thinking/
-speaking), live transcript, and the assistant reply shown inline as a conversation. Replaces the
-old AssistantBar (still exports the `AssistantStatus` type). Accessible: aria-pressed mic,
-aria-live regions, focus-visible ring, reduced-motion honored.
+**Unified capture** (`components/CaptureCard.tsx`): one clean card holds the text field with an
+inline mic button (radiating rings while listening), a footer showing keyboard hints or the
+live status (listening/thinking/speaking), a ⚙ popover for voice settings (speak-aloud switch,
+reply-length chip, voice picker + ▶ preview), and the assistant reply below as a soft 🧠 bubble.
+Replaces the earlier two-card VoicePanel + CaptureBox stack (both deleted, along with
+AssistantBar — `AssistantStatus` type now lives here). Accessible: aria-pressed mic, role=switch
+toggle, aria-live regions, focus-visible ring, reduced-motion honored.
 
 **Persona**: the assistant speaks as the brain itself — a dry, deadpan, technically-literate
 version of the user (Sahil). Short sentences, zero filler openers, ribbing not gushing. All
