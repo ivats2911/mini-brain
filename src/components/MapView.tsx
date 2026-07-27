@@ -215,13 +215,15 @@ export function MapView({ rules, thoughts, onDelete, lastSaved }: Props) {
       linkForce.strength(0.06);
     }
     if (!reduceMotion) {
-      // Gentle per-node wander so the field never looks frozen.
+      // Gentle per-node wander so the field never looks frozen, plus a soft
+      // pull toward the origin so the constellation stays a cohesive centered
+      // cloud instead of dispersing off-screen over time.
       const wander = Object.assign(
         () => {
           const t = performance.now() / 1000;
           for (const nd of dataRef.current?.nodes ?? []) {
-            nd.vx = (nd.vx ?? 0) + Math.sin(t * 0.5 + nd.id * 1.7) * 0.015;
-            nd.vy = (nd.vy ?? 0) + Math.cos(t * 0.4 + nd.id * 2.3) * 0.015;
+            nd.vx = (nd.vx ?? 0) + Math.sin(t * 0.5 + nd.id * 1.7) * 0.008 - (nd.x ?? 0) * 0.0009;
+            nd.vy = (nd.vy ?? 0) + Math.cos(t * 0.4 + nd.id * 2.3) * 0.008 - (nd.y ?? 0) * 0.0009;
           }
         },
         { initialize: () => undefined },
@@ -231,8 +233,12 @@ export function MapView({ rules, thoughts, onDelete, lastSaved }: Props) {
 
     const onResize = () => graph.width(el.clientWidth).height(el.clientHeight);
     window.addEventListener('resize', onResize);
+    // Dev-only: expose the instance so tooling (screenshots, debugging) can
+    // call e.g. zoomToFit. Never referenced by app code.
+    if (import.meta.env.DEV) (window as unknown as { __mbGraph?: unknown }).__mbGraph = graph;
     return () => {
       window.removeEventListener('resize', onResize);
+      if (import.meta.env.DEV) delete (window as unknown as { __mbGraph?: unknown }).__mbGraph;
       graph._destructor();
       graphRef.current = null;
     };
