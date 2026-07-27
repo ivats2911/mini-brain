@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Read the contributing guide first
+    url: https://github.com/ivats2911/mini-brain/blob/main/CONTRIBUTING.md
+    about: How to set up the project and open a good pull request.
